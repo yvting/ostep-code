@@ -36,9 +36,10 @@
 \begin{document}
 \maketitle
 
-\section{The Basic Correctness of the Spin Lock}
+%\section{The Basic Correctness of the Spin Lock}
 
 \begin{mythm}[Correctness of the Spin Lock with One Critical Section]
+\label{ref:spin-lock-correctness}
 
 The following code shows the implementation of a spin lock as
 described in Operating Systems: Three Easy Pieces.
@@ -93,7 +94,7 @@ the critical section.
   \begin{quote}
     A thread is critical if its \kwd{PC} is either in the critical
     section (lines 7-9) or in the spin loop (line 6) with $\kv ==
-    0$. Otherwise, it is not critical, i.e., it is not in the critical
+    0$. Otherwise, it is not critical (non-critical), i.e., it is not in the critical
     section and if it is in the spin loop then $\kv == 1$.
   \end{quote}
   %
@@ -118,20 +119,26 @@ the critical section.
     non-critical thread $t$ can only step in one of the following ways:
     %
     \begin{itemize}
-    \item $t$ is not in the critical section or the spin loop. Then,
-      $t$ is still a non-critical thread $\kflag == 0$ after the
-      execution. The only interesting case is when \kwd{PC} is at line
-      4 and $t$ enters the spin loop after the execution.
+    \item $t$ is not in the critical section or the spin loop. 
 
-    \item $t$ is in the spin loop with $\kv == 1$. There are two cases
-      to consider:
-      %
       \begin{itemize}
-      \item \kwd{PC} is at line 5. After the execution, $\kv == 0$ and
-        $\kflag == 1$. $t$ becomes the only critical thread.
-      \item \kwd{PC} is at line 6. After the execution, $\kv == 1$ and
-        $\kflag == 0$. $t$ is still a non-critical thread.
+      \item If \kwd{PC} is at lines 1-4, then after the execution $t$
+        is still not in the critical section or the spin loop and
+        \kflag is unchanged. Therefore, the first condition of the
+        invariant still holds;
+
+      \item If \kwd{PC} is at line 5, then after the execution, we
+        have $\kflag == 1$ and $v == 0$. By definition, $t$ becomes
+        the one and the only critical thread. Now, the second
+        condition of the invariant holds.
+
       \end{itemize}
+
+
+    \item If $t$ is in the spin loop with $\kv == 1$, then obviously
+      $t$ is non-critical after the execution and $\kflag$ is
+      unchanged. Therefore, the first condition of the invariant
+      holds.
 
     \end{itemize}
     
@@ -141,11 +148,49 @@ the critical section.
     cases to consider:
     %
     \begin{itemize}
-    \item \kwd{PC} is at line 5.
-    \end{itemize}
-    
+    \item If \kwd{PC} is at line 6 with $\kv == 0$, then $t$ goes into
+      the critical section and \kflag is unchanged. The second
+      condition of the invariant still holds;
 
+    \item If \kwd{PC} is at lines 7-8, then $t$ stays in the critical
+      section with \kflag unchanged. The second condition of the
+      invariant still holds;
+
+    \item If \kwd{PC} is at line 9, then $t$ goes out of the critical
+      section (becomes non-critical) and $\kflag == 0$ after
+      the execution. Because $t$ is the only critical thread, the first
+      condition of the invariant holds after the execution.
+    \end{itemize}
+    %
+    When $t'$ executes, there are the following cases to consider:
+    %
+    \begin{itemize}
+    \item $t'$ is not in the critical section or the spin loop. 
+      %
+      \begin{itemize}
+      \item If \kwd{PC} is at lines 1-4, then $t'$ is still
+        non-critical and \kflag is unchanged after the execution. The
+        second condition of the invariant still holds;
+
+      \item If \kwd{PC} is at line 5, then after the execution, we
+        still have $\kflag == 1$ and $v == 1$. By definition, $t'$ is
+        still non-critical. Therefore, the second condition of the
+        invariant still holds.
+
+      \end{itemize}
+
+      \item If $t$ is in the spin loop with $\kv == 1$, then obviously
+        $t$ is non-critical after the execution and $\kflag$ is
+        unchanged. Therefore, the second condition of the invariant
+        still holds.
+    \end{itemize}
   \end{itemize}
 \end{proof}
+
+Theorem~\ref{ref:spin-lock-correctness} can easily generalized to deal
+with critical sections with multiple entry and exit points. The only
+requirement is that to reach any exit point the execution must first
+go through an entry point. It can also be generalized to deal with
+multiple critical sections.
 
 \end{document}

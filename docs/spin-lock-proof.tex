@@ -1,0 +1,151 @@
+\documentclass{article}[10pt]
+
+\usepackage{amsmath}
+\usepackage{fullpage}
+\usepackage{times}
+\usepackage{listings}
+\usepackage{xspace}
+
+\lstset
+{ %Formatting for code in appendix
+    language=C,
+    basicstyle=\footnotesize\ttfamily,
+    numbers=left,
+    stepnumber=1,
+    showstringspaces=false,
+    tabsize=1,
+    breaklines=true,
+    breakatwhitespace=false,
+}
+
+\usepackage{amsthm}
+
+\newtheorem{mydef}{Definition}
+\newtheorem{mythm}[mydef]{Theorem}
+
+\newcommand{\kwd}[1]{\ensuremath{\text{\ttfamily #1}}\xspace}
+
+\def\kflag{\kwd{flag}}
+\def\kv{\kwd{v}}
+
+\title{The Correctness Proof of a Spin Lock Algorithm}
+\author{Yuting Wang}
+\date{Feb 14th, 2021}
+
+
+\begin{document}
+\maketitle
+
+\section{The Basic Correctness of the Spin Lock}
+
+\begin{mythm}[Correctness of the Spin Lock with One Critical Section]
+
+The following code shows the implementation of a spin lock as
+described in Operating Systems: Three Easy Pieces.
+%
+\begin{lstlisting}
+  typedef struct __lock_t {
+    int flag;
+  } lock_t;
+
+  void init(lock_t *lock) {
+    // 0: lock is available, 1: lock is held
+    lock->flag = 0;
+  }
+
+  void lock(lock_t *lock) {
+    int v;
+    tst: v = TestAndSet(&lock->flag, 1);
+    if (v == 1) goto tst; // spin-wait (do nothing)
+    // acquire the lock
+  }
+
+  void unlock(lock_t *lock) {
+    lock->flag = 0; // release the lock
+  }  
+\end{lstlisting}
+%
+Suppose the spin lock is used with one critical section as follows
+where the lock and unlock functions are inlined:
+%
+\begin{lstlisting}
+  // The beginning of the code
+  // flag == 0
+  ...
+  int v;
+  tst: v = TestAndSet(flag, 1);
+  if (v == 1) goto tst;
+  // Beginning of the critical section
+  ...
+  flag = 0; // End of the critical section
+  ...
+\end{lstlisting}
+%
+Here, only line 5 and 9 can change the value of \kflag.
+%
+Suppose also that $n (n > 1)$ threads start their execution from the
+beginning, then at any moment there is at most one thread executing in
+the critical section.
+\end{mythm}
+%
+\begin{proof}
+  First, we define \emph{critical threads}. 
+  \begin{quote}
+    A thread is critical if its \kwd{PC} is either in the critical
+    section (lines 7-9) or in the spin loop (line 6) with $\kv ==
+    0$. Otherwise, it is not critical, i.e., it is not in the critical
+    section and if it is in the spin loop then $\kv == 1$.
+  \end{quote}
+  %
+  We design the following invariant:
+  \begin{quote}
+    At any point of execution, only one of the following conditions hold:
+    \begin{itemize}
+    \item Every thread is non-critical and $\kflag == 0$;
+    \item Exactly one thread is critical and $\kflag == 1$.
+    \end{itemize}
+  \end{quote}
+  % 
+  We show that the above condition is indeed an
+  invariant. Obviously, it holds at the beginning of the execution as
+  every thread is non-critical and $\kflag == 0$ at the start. We also
+  need to show that if the invariant holds before one step of
+  execution, then it also holds after. We consider all the possible cases
+  of one-step execution listed below:
+  %
+  \begin{itemize}
+  \item If every thread is non-critical and $\kflag == 0$, then a
+    non-critical thread $t$ can only step in one of the following ways:
+    %
+    \begin{itemize}
+    \item $t$ is not in the critical section or the spin loop. Then,
+      $t$ is still a non-critical thread $\kflag == 0$ after the
+      execution. The only interesting case is when \kwd{PC} is at line
+      4 and $t$ enters the spin loop after the execution.
+
+    \item $t$ is in the spin loop with $\kv == 1$. There are two cases
+      to consider:
+      %
+      \begin{itemize}
+      \item \kwd{PC} is at line 5. After the execution, $\kv == 0$ and
+        $\kflag == 1$. $t$ becomes the only critical thread.
+      \item \kwd{PC} is at line 6. After the execution, $\kv == 1$ and
+        $\kflag == 0$. $t$ is still a non-critical thread.
+      \end{itemize}
+
+    \end{itemize}
+    
+  \item If there is only one critical thread $t$ and $\kflag == 1$,
+    then either $t$ executes one step or a non-critical thread $t'$
+    executes one step. When $t$ executes, there are the following
+    cases to consider:
+    %
+    \begin{itemize}
+    \item \kwd{PC} is at line 5.
+    \end{itemize}
+    
+
+  \end{itemize}
+\end{proof}
+
+\end{document}

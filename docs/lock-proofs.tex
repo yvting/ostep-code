@@ -452,7 +452,7 @@ the critical section.
     \item if $\kticket == \kturn$, then every thread is non-critical;
     \item if $\kticket > \kturn$, then there is exactly one thread
       that is critical and there is $\kticket - \kturn - 1$ waiting
-      threads.
+      threads with their $\kmyturn == \{\kturn+1,...,\kticket - 1\}$.
     \end{itemize}
   \end{quote}
   % 
@@ -464,96 +464,92 @@ the critical section.
   possible cases of one-step execution listed below:
   %
   \begin{itemize}
+  %
   \item $\kticket == \kturn$ and every thread is non-critical. In this
     case, a non-critical thread $t$ can only step in one of the
     following ways:
     %
     \begin{itemize}
-    \item If \kwd{PC} is at lines 1-4, then after the execution $t$
-      is still not in the critical section or the spin loop and
-      \kflag is unchanged. Therefore, the first condition of the
+    \item If \kwd{PC} is at lines 1-4, then after the execution $t$ is
+      still not in the critical section or the spin loop and \kticket
+      and \kturn are unchanged. Therefore, the first condition of the
       invariant still holds;
 
-    \item If \kwd{PC} is at line 5, then after the execution, we
-      have $\kflag == 1$ and $v == 0$. By definition, $t$ becomes
-      the one and the only critical thread. Now, the second
-      condition of the invariant holds.
+    \item If \kwd{PC} is at line 5, then after the execution, we have
+      $\kturn == \kmyturn$ and $\kticket == \kturn + 1$. By
+      definition, $t$ becomes the one and the only critical
+      thread. Now, the second condition of the invariant holds;
+
+      \item If \kwd{PC} is at line 12, then obviously the first
+        condition of the invariant still holds.
 
     \end{itemize}
 
-  \end{itemize}
-
-  \begin{itemize}
-  \item If every thread is non-critical and $\kflag == 0$, then a
-    non-critical thread $t$ can only step in one of the following ways:
+  \item 
+    % 
+    $\kticket > \kturn$ and there is exactly one thread that is
+    critical and there is $\kticket - \kturn - 1$ waiting threads with
+    their $\kmyturn == \{\kturn+1,...,\kticket - 1\}$. Then, either
+    the critical thread runs for one step, or a non-critical thread or
+    a waiting thread runs.
+    % 
+    When the critical thread $t$ runs, then are the following cases
+    to consider:
     %
     \begin{itemize}
-    \item $t$ is not in the critical section or the spin loop. 
+    \item If \kwd{PC} is at line 6 with $\kturn == \kmyturn$, then $t$
+      goes into the critical section and \kturn and \kticket are
+      unchanged. The second condition of the invariant still holds;
 
-      \begin{itemize}
-      \item If \kwd{PC} is at lines 1-4, then after the execution $t$
-        is still not in the critical section or the spin loop and
-        \kflag is unchanged. Therefore, the first condition of the
-        invariant still holds;
+    \item If \kwd{PC} is at lines 7-10, then $t$ stays in the critical
+      section with \kturn and \kticket unchanged. The second condition
+      of the invariant still holds;
 
-      \item If \kwd{PC} is at line 5, then after the execution, we
-        have $\kflag == 1$ and $v == 0$. By definition, $t$ becomes
-        the one and the only critical thread. Now, the second
-        condition of the invariant holds.
-
-      \end{itemize}
-
-
-    \item If $t$ is in the spin loop with $\kv == 1$, then obviously
-      $t$ is non-critical after the execution and $\kflag$ is
-      unchanged. Therefore, the first condition of the invariant
-      holds.
-
-    \end{itemize}
-    
-  \item If there is only one critical thread $t$ and $\kflag == 1$,
-    then either $t$ executes one step or a non-critical thread $t'$
-    executes one step. When $t$ executes, there are the following
-    cases to consider:
-    %
-    \begin{itemize}
-    \item If \kwd{PC} is at line 6 with $\kv == 0$, then $t$ goes into
-      the critical section and \kflag is unchanged. The second
-      condition of the invariant still holds;
-
-    \item If \kwd{PC} is at lines 7-8, then $t$ stays in the critical
-      section with \kflag unchanged. The second condition of the
-      invariant still holds;
-
-    \item If \kwd{PC} is at line 9, then $t$ goes out of the critical
-      section (becomes non-critical) and $\kflag == 0$ after
-      the execution. Because $t$ is the only critical thread, the first
-      condition of the invariant holds after the execution.
-    \end{itemize}
-    %
-    When $t'$ executes, there are the following cases to consider:
-    %
-    \begin{itemize}
-    \item $t'$ is not in the critical section or the spin loop. 
+    \item If \kwd{PC} is at line 11, then $t$ goes out of the critical
+      section (becomes non-critical) and $\kturn$ increases by $1$
+      after the execution. There are two cases to consider:
       %
       \begin{itemize}
-      \item If \kwd{PC} is at lines 1-4, then $t'$ is still
-        non-critical and \kflag is unchanged after the execution. The
-        second condition of the invariant still holds;
+      \item If $\kticket == \kturn +1$ before the execution, then
+        there is no waiting thread. After the execution, every thread
+        becomes non-critical and $\kticket == \kturn$. The first
+        condition of the invariant holds;
 
-      \item If \kwd{PC} is at line 5, then after the execution, we
-        still have $\kflag == 1$ and $v == 1$. By definition, $t'$ is
-        still non-critical. Therefore, the second condition of the
+      \item If $\kticket > \kturn +1$ before the execution, then there
+        is one or more waiting thread. After the execution, the
+        waiting thread with $\kmyturn == \kturn +1$ before the
+        execution becomes the only critical thread and the remaining
+        threads are still waiting. The second condition of the
         invariant still holds.
 
       \end{itemize}
 
-      \item If $t$ is in the spin loop with $\kv == 1$, then obviously
-        $t$ is non-critical after the execution and $\kflag$ is
-        unchanged. Therefore, the second condition of the invariant
-        still holds.
     \end{itemize}
+    % 
+    When a non-critical thread $t'$ runs for one step, there are the
+    following cases to consider:
+    %
+    \begin{itemize}
+    \item If \kwd{PC} is at lines 1-4, then $t'$ is still non-critical
+      and \kticket and \kturn are unchanged after the execution. The
+      second condition of the invariant still holds;
+
+    \item If \kwd{PC} is at line 5, then after the execution, a new
+      waiting thread with $\kmyturn == \kticket$ is added. The second
+      condition of the invariant still holds;
+
+    \item If \kwd{PC} is at line 12, then obviously the second
+      condition of the invariant still holds.
+
+    \end{itemize}
+    % 
+    When a waiting thread $t'$ runs for one step, it stays as a
+    waiting thread. Therefore, the second condition of the invariant
+    still holds.
+    
   \end{itemize}
+
+
 \end{proof}
 
 

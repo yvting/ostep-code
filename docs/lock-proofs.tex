@@ -453,6 +453,8 @@ the critical section.
     \item if $\kticket > \kturn$, then there is exactly one thread
       that is critical and there is $\kticket - \kturn - 1$ waiting
       threads with their $\kmyturn == \{\kturn+1,...,\kticket - 1\}$.
+      Furthermore, if the \kwd{PC} of the critical thread is at line
+      11, then $\kv == \kturn + 1$. 
     \end{itemize}
   \end{quote}
   % 

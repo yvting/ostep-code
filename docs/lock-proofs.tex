@@ -28,7 +28,7 @@
 \def\kflag{\kwd{flag}}
 \def\kv{\kwd{v}}
 
-\title{The Correctness Proof of a Spin Lock Algorithm}
+\title{The Correctness Proofs of Lock Algorithms}
 \author{Yuting Wang}
 \date{Feb 14th, 2021}
 
@@ -37,6 +37,7 @@
 \maketitle
 
 \section{Correctness of the Spin Lock using Atomic Exchange}
+\label{sec:spin-lock-xchg}
 
 \begin{mythm}[Correctness of the Spin Lock with One Critical Section]
 \label{thm:spin-lock-correct-xchg}
@@ -195,6 +196,7 @@ multiple critical sections.
 
 
 \section{Correctness of the Spin Lock using Compare-and-swap(CAS)}
+\label{sec:spin-lock-cas}
 
 \begin{mythm}[Correctness of the Spin Lock with One Critical Section]
 \label{thm:spin-lock-correct-cas}
@@ -347,5 +349,11 @@ the critical section.
   \end{itemize}
   
 \end{proof}
+
+
+\section{Correctness of a Ticket Lock Algorithm}
+\label{sec:ticket-lock}
+
+
 
 \end{document}

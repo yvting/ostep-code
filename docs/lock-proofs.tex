@@ -533,28 +533,22 @@ the critical section.
 \label{thm:spin-lock-correct-yield}
 
 The implementation of the spin lock is the same as that
-in~\secref{sec:spin-lock-xchg}.
+in~\secref{sec:spin-lock-xchg} with the exception that a spinning
+thread will yield.
 %
 \begin{lstlisting}
-  typedef struct __lock_t {
-    int flag;
-  } lock_t;
-
-  void init(lock_t *lock) {
-    // 0: lock is available, 1: lock is held
-    lock->flag = 0;
-  }
+  ...
 
   void lock(lock_t *lock) {
     int v;
     tst: v = TestAndSet(&lock->flag, 1);
-    if (v == 1) goto tst; // spin-wait (do nothing)
-    // acquire the lock
+    if (v != 1) return; 
+    // give up the CPU
+    yield();
+    goto tst;
   }
 
-  void unlock(lock_t *lock) {
-    lock->flag = 0; // release the lock
-  }  
+  ...
 \end{lstlisting}
 %
 Suppose the spin lock is used with one critical section as follows
@@ -566,19 +560,346 @@ where the lock and unlock functions are inlined:
   ...
   int v;
   tst: v = TestAndSet(&flag, 1);
-  if (v == 1) goto tst;
-  // Beginning of the critical section
+  if (v != 1) goto sec; 
+  yield();  // give up the CPU
+  goto tst;
+  sec: // Beginning of the critical section
   ...
   flag = 0; // End of the critical section
   ...
 \end{lstlisting}
 %
-Here, only line 5 and 9 can change the value of \kflag.
+Here, only lines 5 and 11 change the value of \kflag.
 %
 Suppose also that $n (n > 1)$ threads start their execution from the
 beginning, then at any moment there is at most one thread executing in
 the critical section.
 \end{mythm}
+%
+\begin{proof}
+  %% The proof should be mostly the same as that
+  %% of~\thmref{thm:spin-lock-correct-xchg}.
 
+  \textcolor{red}{With the introduction of \kwd{yield}, we acknowledge
+    that a thread can be in the \emph{ready} or \emph{running} state
+    at any moment of execution. It means that at any moment of
+    execution we have to consider the possibility that a ready thread
+    will become running and a running thread will become ready (either
+    by explicitly calling \kwd{yield} or be preempted by the
+    scheduler. The rest of the proof has not considered this arbitrary
+    switch of proof states and hence is not complete.}
+
+  First, a thread is in either the running or the ready state. We
+  define \emph{critical running threads}.
+  \begin{quote}
+    A running thread is critical if its \kwd{PC} is either in the
+    critical section (lines 9-11) or in the spin loop (line 6) with
+    $\kv == 0$. Otherwise, it is not critical (non-critical), i.e., it
+    is not in the critical section and if it is in the spin loop then
+    $\kv == 1$.
+  \end{quote}
+  %
+  We design the following invariant:
+  \begin{quote}
+    At any point of execution, only one of the following conditions hold:
+    \begin{itemize}
+    \item Every thread is either ready with \kwd{PC} at line 8
+      (meaning it becomes ready because of the call to \kwd{yield} at
+      line 7) or running and non-critical, and $\kflag == 0$;
+    \item Exactly one thread is critical and the rest is either ready
+      or running and non-critical, and $\kflag == 1$.
+    \end{itemize}
+  \end{quote}
+  % 
+  We show that the above condition is indeed an
+  invariant. Obviously, it holds at the beginning of the execution as
+  every thread is non-critical and $\kflag == 0$ at the start. We also
+  need to show that if the invariant holds before one step of
+  execution, then it also holds after. We consider all the possible
+  cases of one-step execution listed below:
+  %
+  \begin{itemize}
+  \item Every thread is either ready or non-critical and $\kflag ==
+    0$. If a ready thread becomes running, it starts at line 8 and
+    becomes a non-critical thread. The invariant still holds. If a
+    running non-critical thread $t$ executes, it can only step in one
+    of the following ways:
+    %
+    \begin{itemize}
+    \item $t$ is not in the critical section or the spin loop. 
+
+      \begin{itemize}
+      \item If \kwd{PC} is at lines 1-4, then after the execution $t$
+        is still not in the critical section or the spin loop and
+        \kflag is unchanged. Therefore, the first condition of the
+        invariant still holds;
+
+      \item If \kwd{PC} is at line 5, then after the execution, we
+        have $\kflag == 1$ and $v == 0$. By definition, $t$ becomes
+        the one and the only critical thread. Now, the second
+        condition of the invariant holds;
+
+      \item If \kwd{PC} is at line 7, then $t$ becomes a ready thread
+        after the execution, the invariant still holds;
+
+      \item If \kwd{PC} is at line 8, then $t$ is still a non-critical
+        thread after the execution, the invariant still holds;
+
+      \item If \kwd{PC} is at line 12, then obviously the first
+        condition of the invariant still holds.
+
+      \end{itemize}
+
+
+    \item If $t$ is in the spin loop with $\kv == 1$, then obviously
+      $t$ is non-critical after the execution and $\kflag$ is
+      unchanged. Therefore, the first condition of the invariant
+      holds.
+
+    \end{itemize}
+    
+
+    \dots
+  \end {itemize}
+\end{proof}
+
+
+\section{Correctness of a Spin Lock using Waiting Queues}
+\label{sec:spin-lock-queue}
+%
+\begin{mythm}[Correctness of a Spin Lock using Waiting Queues]
+\label{thm:spin-lock-correct-queue}
+
+The following is a lock used in Solaris:
+%
+\begin{lstlisting}
+  typedef struct __lock_t {
+    int flag;
+    int guard;
+    queue_t *q;
+  } lock_t;
+
+  void lock_init(lock_t *m) {
+    m->flag = 0;
+    m->guard = 0;
+    queue_init(m->q);
+  }
+
+  void lock(lock_t *m) {
+    while (TestAndSet(&m->guard, 1) == 1)
+    ; //acquire guard lock by spinning
+    if (m->flag == 0) {
+      m->flag = 1; // lock is acquired
+      m->guard = 0;
+    } else {
+      queue_add(m->q, gettid());
+      setpark();
+      m->guard = 0;
+      park();
+    }
+  }
+
+  void unlock(lock_t *m) {
+    while (TestAndSet(&m->guard, 1) == 1)
+    ; //acquire guard lock by spinning
+    if (queue_empty(m->q))
+    m->flag = 0; // let go of lock; no one wants it
+    else
+    unpark(queue_remove(m->q)); // hold lock (for next thread!)
+    m->guard = 0;
+  }  
+\end{lstlisting}
+%
+Here, \kpark puts a calling thread to sleep (from running to waiting)
+and $\kunpark(\kid)$ wakes up the thread \kid (from waiting to ready).
+%
+By calling the $\ksetpark$ routine, a thread can indicate it is about
+to park. If it then happens to be interrupted and another thread calls
+unpark before park is actually called, the subsequent park returns
+immediately instead of sleeping.
+%
+Suppose this lock is used with one critical section as follows where
+the lock and unlock functions are inlined (where \kslock and \ksunlock
+represents the operations of the simple spin lock):
+%
+\begin{lstlisting}
+  // The beginning of the code
+  ...
+  slock(&guard);
+  if (flag == 0) {
+    flag = 1; // lock is acquired
+    sunlock(&guard);
+  } else {
+    queue_add(q, gettid());
+    setpark();
+    sunlock(&guard);
+    park(); 
+  }
+  // Beginning of the critical section
+  ...
+  slock(&guard);
+  if (queue_empty(q))
+    flag = 0; // let go of lock; no one wants it
+  else
+    unpark(queue_remove(q)); // hold lock (for next thread!)
+  sunlock(&guard); // End of the critical section
+  ...
+\end{lstlisting}
+%
+Here, only line 5 and 17 can change the value of \kflag.
+%
+Suppose also that $n (n > 1)$ threads start their execution from the
+beginning, then at any moment there is at most one thread executing in
+the critical section.
+\end{mythm}
+%
+\begin{proof}
+  Observe that only the instructions between $\kslock$ and $\ksunlock$
+  can change the values of $\kq$ and $\kflag$. Given any sequence $S$
+  of instructions between $\kslock$ and $\ksunlock$, any other
+  instructions interleaved with this sequence can be moved to after
+  $\ksunlock$. This is because:
+  \begin{itemize}
+  \item These other instructions cannot affect the instructions in $S$
+    because they cannot alter the values manipulated by
+    $S$. Otherwise, they must be instructions between $\kslock$ and
+    $\ksunlock$ and the $\kslock$ guarantees this cannot happen;
+  \item The instructions in $S$ cannot affect these other instructions
+    because they do not read values manipulated by $S$ for the same
+    reason.
+  \end{itemize}
+
+  There are three states for threads: running, ready or waiting
+  (asleep). We are only interested in knowing if a thread is waiting
+  or not. Therefore, we ignore the difference between ready and
+  running threads.
+
+  Given the above observations, we define \emph{critical threads}. 
+  \begin{quote}
+    A thread is critical if it is not waiting and one of the following
+    condition is satisfied:
+    %
+    \begin{itemize}
+    \item it is in the critical section;
+    \item it is at line 11, and has been sent the unpark signal.
+    \end{itemize}
+    % 
+    Otherwise, the thread is called non-critical. That is, it is
+    either waiting, or not waiting and not in the critical section and
+    if it is at line 11, it has not been sent the unpark signal.
+  \end{quote}
+  %
+  We design the following invariant:
+  \begin{quote}
+    At any point of execution, \kq contains all the threads that are
+    either waiting or are set to be parked and not yet
+    unparked. Furthermore, only one of the following conditions hold:
+    \begin{itemize}
+    \item Every thread is non-critical and $\kflag == 0$;
+    \item Exactly one thread is critical and $\kflag == 1$.
+    \end{itemize}
+  \end{quote}
+  % 
+  We show that the above condition is indeed an
+  invariant. Obviously, it holds at the beginning of the execution as
+  every thread is non-critical and $\kflag == 0$ at the start. We also
+  need to show that if the invariant holds before one step of
+  execution, then it also holds after. We consider all the possible
+  cases of one-step execution listed below:
+  %
+  \begin{itemize}
+  \item If every thread is non-critical and $\kflag == 0$, then a
+    non-critical and non-waiting thread $t$ can only step in one of
+    the following ways:
+    %
+    \begin{itemize}
+    \item $t$ is not in the critical section or at line 11. 
+
+      \begin{itemize}
+      \item If \kwd{PC} is at lines 1-2, then obviously the first
+        condition of the invariant holds after execution;
+
+      \item If \kwd{PC} is at line 3, then after the (atomic)
+        execution, we have $\kflag == 1$ and $t$ enters the critical
+        section. Now, the second condition of the invariant holds;
+
+      \item If \kwd{PC} is at line 21, then obviously the first
+        condition of the invariant still holds.
+      \end{itemize}
+
+    \item 
+      If $t$ is at line 11 and has not been sent the unpark signal.
+      In this case, $t$ must have been added to \kq and the call to
+      \kpark makes it a waiting thread. The first condition still
+      holds.
+    \end{itemize}
+    
+  \item If there is only one critical thread $t$ and $\kflag == 1$,
+    then either $t$ executes one step or a non-critical and
+    non-waiting thread $t'$ executes one step. When $t$ executes,
+    there are the following cases to consider:
+    %
+    \begin{itemize}
+    \item If \kwd{PC} is at line 11 with \kunpark signal sent, then
+      \kq does not contain $t$. Furthermore, the call \kpark has no
+      effect and $t$ goes into the critical section. The second
+      condition of the invariant still holds;
+
+    \item If \kwd{PC} is at lines 13-14, then $t$ stays in the
+      critical section with \kflag unchanged. The second condition of
+      the invariant still holds;
+
+    \item If \kwd{PC} is at line 15, 
+      %
+      \begin{itemize}
+      \item If \kq is empty, then $t$ goes out of the critical section
+        (becomes non-critical) and $\kflag == 0$ after the execution.
+        Because $t$ is the only critical thread, the first
+        condition of the invariant holds after the execution;
+        
+      \item If \kq is non-empty, then one of the following cases
+        happens:
+        \begin{itemize}
+        \item A waiting thread is unparked and enters the critical
+          section while $t$ becomes non-critical. The second condition
+          of the invariant still holds;
+
+        \item A non-waiting thread that is set to park while not yet
+          received the unpark signal is activated. After that, it
+          becomes a critical thread while $t$ becomes non-critical.
+          The second condition of the invariant still holds.
+        \end{itemize}
+
+      \end{itemize}
+
+    \end{itemize}
+    %
+    When $t'$ executes, there are the following cases to consider:
+    %
+    \begin{itemize}
+    \item $t'$ is not in the critical section or at line 11. 
+
+      \begin{itemize}
+      \item If \kwd{PC} is at lines 1-2, then obviously the second
+        condition of the invariant holds after execution;
+
+      \item If \kwd{PC} is at line 3, then after the (atomic)
+        execution, $t'$ reaches line 11 and becomes a non-critical
+        thread and $\kq$ is updated accordingly. The second condition
+        of the invariant still holds;
+
+      \item If \kwd{PC} is at line 21, then obviously the second
+        condition of the invariant still holds.
+      \end{itemize}
+
+    \item 
+      If $t'$ is at line 11 and has not been sent the unpark signal.
+      In this case, $t$ must have been added to \kq and the call to
+      \kpark makes it a waiting thread. The second condition still
+      holds.
+    \end{itemize}
+  \end{itemize}
+  
+\end{proof}
 
 \end{document}

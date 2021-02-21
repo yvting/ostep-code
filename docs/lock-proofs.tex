@@ -169,7 +169,7 @@ the critical section.
   \end{itemize}
 \end{proof}
 
-Theorem~\ref{thm:spin-lock-correct-xchg} can easily generalized to deal
+\thmref{thm:spin-lock-correct-xchg} can easily generalized to deal
 with critical sections with multiple entry and exit points. The only
 requirement is that to reach any exit point the execution must first
 go through an entry point. It can also be generalized to deal with
@@ -231,7 +231,7 @@ the critical section.
 %
 \begin{proof}
   The proof is mostly similar to that of
-  Theorem~\ref{thm:spin-lock-correct-xchg}. We discuss it below.
+  \thmref{thm:spin-lock-correct-xchg}. We discuss it below.
 
   First, we define \emph{critical threads}. 
   \begin{quote}
@@ -532,8 +532,8 @@ the critical section.
 \begin{mythm}[Correctness of the Spin Lock with Yield]
 \label{thm:spin-lock-correct-yield}
 
-The implementation of the spin lock is the same as that in
-
+The implementation of the spin lock is the same as that
+in~\secref{sec:spin-lock-xchg}.
 %
 \begin{lstlisting}
   typedef struct __lock_t {

@@ -1,37 +1,7 @@
 \documentclass{article}[10pt]
 
-\usepackage{amsmath}
 \usepackage{fullpage}
-\usepackage{times}
-\usepackage{listings}
-\usepackage{xspace}
-
-\lstset
-{ %Formatting for code in appendix
-    language=C,
-    basicstyle=\footnotesize\ttfamily,
-    numbers=left,
-    stepnumber=1,
-    showstringspaces=false,
-    tabsize=1,
-    breaklines=true,
-    breakatwhitespace=false,
-}
-
-\usepackage{amsthm}
-
-\newtheorem{mydef}{Definition}
-\newtheorem{mythm}[mydef]{Theorem}
-
-\newcommand{\kwd}[1]{\ensuremath{\text{\ttfamily #1}}\xspace}
-
-\def\kflag{\kwd{flag}}
-\def\kv{\kwd{v}}
-\def\kturn{\kwd{turn}}
-\def\kmyturn{\kwd{myturn}}
-\def\kticket{\kwd{ticket}}
-
-
+\usepackage{concur}
 
 \title{The Correctness Proofs of Lock Algorithms}
 \author{Yuting Wang}
@@ -553,6 +523,62 @@ the critical section.
 
 
 \end{proof}
+
+
+\section{Correctness of the Spin Lock with Yield}
+\label{sec:spin-lock-yield}
+
+
+\begin{mythm}[Correctness of the Spin Lock with Yield]
+\label{thm:spin-lock-correct-yield}
+
+The implementation of the spin lock is the same as that in
+
+%
+\begin{lstlisting}
+  typedef struct __lock_t {
+    int flag;
+  } lock_t;
+
+  void init(lock_t *lock) {
+    // 0: lock is available, 1: lock is held
+    lock->flag = 0;
+  }
+
+  void lock(lock_t *lock) {
+    int v;
+    tst: v = TestAndSet(&lock->flag, 1);
+    if (v == 1) goto tst; // spin-wait (do nothing)
+    // acquire the lock
+  }
+
+  void unlock(lock_t *lock) {
+    lock->flag = 0; // release the lock
+  }  
+\end{lstlisting}
+%
+Suppose the spin lock is used with one critical section as follows
+where the lock and unlock functions are inlined:
+%
+\begin{lstlisting}
+  // The beginning of the code
+  // flag == 0
+  ...
+  int v;
+  tst: v = TestAndSet(&flag, 1);
+  if (v == 1) goto tst;
+  // Beginning of the critical section
+  ...
+  flag = 0; // End of the critical section
+  ...
+\end{lstlisting}
+%
+Here, only line 5 and 9 can change the value of \kflag.
+%
+Suppose also that $n (n > 1)$ threads start their execution from the
+beginning, then at any moment there is at most one thread executing in
+the critical section.
+\end{mythm}
 
 
 \end{document}

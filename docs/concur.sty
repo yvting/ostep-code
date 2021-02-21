@@ -1,0 +1,28 @@
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{times}
+\usepackage{listings}
+\usepackage{xspace}
+
+\lstset
+{ %Formatting for code in appendix
+    language=C,
+    basicstyle=\footnotesize\ttfamily,
+    numbers=left,
+    stepnumber=1,
+    showstringspaces=false,
+    tabsize=1,
+    breaklines=true,
+    breakatwhitespace=false,
+}
+
+
+\newtheorem{mydef}{Definition}
+\newtheorem{mythm}[mydef]{Theorem}
+
+\newcommand{\kwd}[1]{\ensuremath{\text{\ttfamily #1}}\xspace}
+
+\def\kflag{\kwd{flag}}
+\def\kv{\kwd{v}}
+\def\kturn{\kwd{turn}}
+\def\kmyturn{\kwd{myturn}}
+\def\kticket{\kwd{ticket}}
